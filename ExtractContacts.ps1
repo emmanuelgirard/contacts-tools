@@ -211,22 +211,29 @@ $clean_arrContacts = $arrContacts | Select-Object Address, Name,
     expr = { $_.Address.Split("@")[1] }
 },
 @{
-    #@ and "" and maybe 3 or 4
+    # TODO Gather the different Name Format Extracted from Outlook Display Name
+    # This is a First attempt to split the Outlook Display Name into different parts
+    # We prefer play safe here and have empty strings instead of messing up our contacts names
     name = 'First'
     expr = {    
        
+        # Last, First [9]
         if ($_.Name.Contains('[')) {
             $_.Name.Split(",")[1].Split("[")[0].Trim()
         }
-        elseif ($_.Name.Contains('(')) {
-            $_.Name.Split(" ")[1].Trim()
+        # First Middle Last (f.last@domain.com)
+        elseif ($_.Name.Contains('(') -and $_.Name.Contains('@')) {
+            ""
         }
+        # Last, First
         elseif ($_.Name.Contains(',')) {
             $_.Name.Split(",")[1].Trim()
         }
+        # f.last@domain.com
         elseif ($_.Name.Contains('@')) {
             ""
         }
+        # First Last
         else {
             $_.Name.Split(" ")[0].Trim()
         }
@@ -236,10 +243,13 @@ $clean_arrContacts = $arrContacts | Select-Object Address, Name,
 @{
     name = 'Last'
     expr = {
-       
         if ($_.Name.Contains(',')) {
             $_.Name.Split(",")[0].Trim()
         }
+        # First Middle Last (f.last@domain.com)
+        elseif ($_.Name.Contains('(') -and $_.Name.Contains('@')) {
+            ""
+        }        
         elseif ($_.Name.Contains('@')) {
             ""
         }
@@ -248,7 +258,7 @@ $clean_arrContacts = $arrContacts | Select-Object Address, Name,
         }
        
     }
-} | Sort-Object Domain 
+} | Sort-Object Domain
 
 if ($exclude_domains -gt 0) {
     Write-Host "Excluding Domains from Parameter : "
