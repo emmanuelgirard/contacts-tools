@@ -2,4 +2,5 @@
 *.xls
 *.xlsx
 .DS_Store
-.personnal/
+.personnal
+*.zip

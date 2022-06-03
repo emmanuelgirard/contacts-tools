@@ -1,7 +1,8 @@
 param (
     [Parameter(Mandatory)] $email, 
     $output_file_prefix = "Contacts",
-    $folder_patern = "Sent", 
+    $folder_pattern = "Sent",
+    $folder_exclude_pattern = "",
     $max_subfolders_depth = 0,
     $include_from = $false,
     $process_email = $true, 
@@ -44,14 +45,14 @@ Write-Host "From Date: $from_date"
 
 # This will Pop-Up a Browser to Authenticate to Microsoft and Authorize the PowerShell Application
 Connect-MgGraph -Scopes 'User.Read,Mail.Read,Calendars.Read' | Out-Null
-if ($debug_output) {$global:api_calls_count += 1}
+if ($debug_output) { $global:api_calls_count += 1 }
 
 # Replace with your username (from parameter)
 $user_id = $email
 
-Function TrackTime($Time){
+Function TrackTime($Time) {
     If (!($Time)) { Return Get-Date } Else {
-    Return ((get-date) - $Time)
+        Return ((get-date) - $Time)
     }
 }
 
@@ -60,10 +61,10 @@ Function TrackTime($Time){
 function Get-Childs-Emails ($parent_folder_id, $max, $current = 0) {
     $arrEmails = @()
     $arrEmails += Get-MgUserMailFolderMessage -UserId $user_id -MailFolderId $parent_folder_id -Property "From,ToRecipients,CcRecipients" -Filter "receivedDateTime ge $($from_date)T00:00:00Z" -All
-    if ($debug_output) {$global:api_calls_count += 1}
+    if ($debug_output) { $global:api_calls_count += 1 }
 
     $subFolders = Get-MgUserMailFolderChildFolder  -UserId $user_id -MailFolderId $parent_folder_id -All
-    if ($debug_output) {$global:api_calls_count += 1}
+    if ($debug_output) { $global:api_calls_count += 1 }
     # if ($debug_output) { 
     #     [console]::CursorLeft = 2*$current
     #     Write-Host "Subfolders: $($subFolders.Count)" 
@@ -72,13 +73,21 @@ function Get-Childs-Emails ($parent_folder_id, $max, $current = 0) {
         if ($subFolders.Count -gt 0) {
             # Write-Host "In if subfolders.Count > 0"
             foreach ($subFolder in $subFolders) {
-                if ($debug_output) { 
-                    [console]::CursorLeft = $current+1
-                    # Write-Host "Subfolder: $($subFolder.DisplayName)"
-                    Write-Host "$($subFolder.DisplayName)"
+
+                if ($folder_exclude_pattern -ne "" -and $subFolder.DisplayName.StartsWith($folder_exclude_pattern)) {
+                    if ($debug_output) { 
+                        [console]::CursorLeft = $current + 1
+                        Write-Host "$($subFolder.DisplayName) - Excluded"
+                    }
                 }
-                $arrEmails += Get-Childs-Emails $subFolder.Id $max ($current + 1)
-                
+                else {
+                    if ($debug_output) { 
+                        [console]::CursorLeft = $current + 1
+                        # Write-Host "Subfolder: $($subFolder.DisplayName)"
+                        Write-Host "$($subFolder.DisplayName)"
+                    }
+                    $arrEmails += Get-Childs-Emails $subFolder.Id $max ($current + 1)
+                }
             }
         }
     }
@@ -93,16 +102,32 @@ if ($process_email) {
     Write-Host "Max Subfolders : $($max_subfolders_depth)"
 
     # Get Parent Folder Objet
-    $parent_folders = Get-MgUserMailFolder -UserId $user_id -Filter "startswith(DisplayName,'$folder_patern')"
-    if ($debug_output) {$global:api_calls_count += 1}
+    $parent_folders = Get-MgUserMailFolder -UserId $user_id -Filter "startswith(DisplayName,'$folder_pattern')"
+    if ($debug_output) { $global:api_calls_count += 1 }
     if ($parent_folders.Count -gt 1) {
-        Write-Host "WARNING: More than one folder found with the pattern: $folder_patern" -ForegroundColor Yellow
+        Write-Host "WARNING: More than one folder found with the pattern: $folder_pattern" -ForegroundColor Yellow
     }
 
     $arrEmails = @()
     foreach ($parent_folders_item in $parent_folders) {
-        Write-Host "Parent Folder: $($parent_folders_item.DisplayName)"
-        $arrEmails += Get-Childs-Emails $parent_folders_item.Id $max_subfolders_depth
+
+
+
+        if ($folder_exclude_pattern -ne "" -and $parent_folders_item.DisplayName.StartsWith($folder_exclude_pattern)) {
+            if ($debug_output) { 
+                Write-Host "$($parent_folders_item.DisplayName) - Excluded"
+            }
+        }
+        else {
+            if ($debug_output) { 
+                [console]::CursorLeft = $current + 1
+                # Write-Host "Subfolder: $($subFolder.DisplayName)"
+                Write-Host "Parent Folder: $($parent_folders_item.DisplayName)"
+            }
+            $arrEmails += Get-Childs-Emails $parent_folders_item.Id $max_subfolders_depth
+        }
+
+        
     }
 
     if ($debug_output) { Write-Host "Number of email parsed : $($arrEmails.Count)" }
@@ -114,7 +139,8 @@ if ($process_email) {
             foreach ($aRecipient in $sent_email.From) {
                 try {
                     $aRecipient.EmailAddress.Address = $aRecipient.EmailAddress.Address.ToLower()
-                } catch {
+                }
+                catch {
                     {
                         Write-Host "WARNING: Recipient with no email address: $($aRecipient.EmailAddress.Name)" -ForegroundColor Yellow
                     }
@@ -142,7 +168,7 @@ if ($process_meeting) {
     Write-Host "Max Meeting Attendees: $($max_meeting_attendees)"
 
     $all_meetings = Get-MgUserEvent -UserId $user_id -Property "Subject,Organizer,Attendees" -Filter "start/dateTime ge '$($from_date)T00:00:00Z'" -All
-    if ($debug_output) {$global:api_calls_count += 1}
+    if ($debug_output) { $global:api_calls_count += 1 }
     # $all_meetings = Get-MgUserEvent -UserId $user_id -Filter "start/dateTime ge '$($from_date)T00:00:00Z'" -All
     # $all_meetings = Get-MgUserEvent -UserId $user_id -Filter "start/dateTime ge '2022-05-01T00:00:00Z'" -All
     if ($debug_output) { Write-Host "Number of meetings : $($all_meetings.Count)" }
@@ -160,7 +186,7 @@ if ($process_meeting) {
         $arrMeetingSubject += $aMeeting.Subject
         
         if ($aMeeting.Attendees.Count -gt $max_meeting_attendees) {
-            if ($debug_output) {Write-Host "WARNING: Meeting with $($aMeeting.Attendees.Count) Attendees: $($aMeeting.Subject)" -ForegroundColor Yellow}
+            if ($debug_output) { Write-Host "WARNING: Meeting with $($aMeeting.Attendees.Count) Attendees: $($aMeeting.Subject)" -ForegroundColor Yellow }
             $skip = $true
         }
         
@@ -178,7 +204,7 @@ if ($process_meeting) {
                     $anAttendee.EmailAddress.Address = $anAttendee.EmailAddress.Address.ToLower()    
                 }
                 catch {
-                        Write-Host "WARNING: Attendee with no email address: $($anAttendee.EmailAddress.Name)" -ForegroundColor Yellow
+                    Write-Host "WARNING: Attendee with no email address: $($anAttendee.EmailAddress.Name)" -ForegroundColor Yellow
                 }
                 $arrContacts += $anAttendee.EmailAddress
             }
@@ -187,7 +213,7 @@ if ($process_meeting) {
                     $anAttendee.EmailAddress.Address = $anAttendee.EmailAddress.Address.ToLower()    
                 }
                 catch {
-                        Write-Host "WARNING: Attendee with no email address: $($anAttendee.EmailAddress.Name)" -ForegroundColor Yellow
+                    Write-Host "WARNING: Attendee with no email address: $($anAttendee.EmailAddress.Name)" -ForegroundColor Yellow
                 }
                 $arrContacts += $anAttendee.EmailAddress
             } 
@@ -198,7 +224,7 @@ if ($process_meeting) {
                         
         }
     }
-    if ($debug_output) { Write-Host "Number of Meetings parsed: $($meetingParsed)"}
+    if ($debug_output) { Write-Host "Number of Meetings parsed: $($meetingParsed)" }
     $time = TrackTime $time
     Write-Host "Elapsed Time Parsing Meetings: $time"
     $time = $null

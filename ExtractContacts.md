@@ -19,7 +19,7 @@ Best effort will be made to fill in the *First* and *Last* column.
 | Parameter | Description | Mandatory | Default |
 | --------- | ----------- | --------- | ------- |
 | $email | Email Adresse of the Account | x | |
-| $folder_patern | Folder name | x | "Sent" |
+| $folder_pattern | Folder name | x | "Sent" |
 | $max_subfolders_depth | 0 Mean it won't recurse into subfolder, 1 only one level depth ... | x | 0 |
 | $include_from | If looking at any other folder then the *Sent Items*, you probably want to enable the From field in the query | x | $False |
 | $process_meeting | Parse Calendar Event | | $false |
