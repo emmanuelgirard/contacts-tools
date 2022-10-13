@@ -33,6 +33,10 @@ if ($include_only_domains_file -ne "") {
     $include_only_domains_from_file = Import-Csv -Path $include_only_domains_file -Delimiter ","
 }
 
+if ($include_only_domains_file -ne "") {
+    $include_only_domains_from_file = Import-Excel -Path $include_only_domains_file -WorksheetName "SF_Accounts_Domains"
+}
+
 # Install-Module ImportExcel -Scope CurrentUser
 # Install-Module Microsoft.Graph -Scope CurrentUser
 
